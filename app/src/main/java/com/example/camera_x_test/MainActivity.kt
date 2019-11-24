@@ -2,10 +2,17 @@ package com.example.camera_x_test
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Matrix
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Size
+import android.view.Surface
 import android.view.TextureView
+import android.view.ViewGroup
 import android.widget.Toast
+import androidx.camera.core.CameraX
+import androidx.camera.core.Preview
+import androidx.camera.core.PreviewConfig
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.util.concurrent.Executors
@@ -37,15 +44,44 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewFinder: TextureView
 
     private fun startCamera() {
-        Toast.makeText(this,
-            "startCamera",
-            Toast.LENGTH_SHORT).show()
+        val previewConfig = PreviewConfig.Builder().apply {
+            setTargetResolution(Size(640, 480))
+        }.build()
+
+        // 上で作成したアプションをPreviewクラス作成時に渡す
+        val preview = Preview(previewConfig)
+
+        preview.setOnPreviewOutputUpdateListener{
+            val parent = viewFinder.parent as ViewGroup
+            parent.removeView(viewFinder)
+            parent.addView(viewFinder, 0)
+
+            viewFinder.surfaceTexture = it.surfaceTexture
+            updateTransform()
+        }
+
+        CameraX.bindToLifecycle(this, preview)
     }
 
     private fun updateTransform() {
-        Toast.makeText(this,
-            "updateTransform",
-            Toast.LENGTH_SHORT).show()
+        val matrix = Matrix()
+
+        // Compute the center of the view finder
+        val centerX = viewFinder.width / 2f
+        val centerY = viewFinder.height / 2f
+
+        // Correct preview output to account for display rotation
+        val rotationDegrees = when(viewFinder.display.rotation) {
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> return
+        }
+        matrix.postRotate(-rotationDegrees.toFloat(), centerX, centerY)
+
+        // Finally, apply transformations to our TextureView
+        viewFinder.setTransform(matrix)
     }
 
     override fun onRequestPermissionsResult(
